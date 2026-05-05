@@ -1,48 +1,186 @@
-import { useState } from "react"
+'use client'
+import { useRef, useState } from 'react'
+import Tooltip from "./Tooltip";
 
-const InputBar = ({ currentMessage, setCurrentMessage, onSubmit }) => {
+interface InputBarProps {
+  currentMessage: string
+  setCurrentMessage: (val: string) => void
+  onSubmit: (e: React.FormEvent) => void
+  onFileSelect?: (file: File) => void
+  uploading?: boolean
+  disabled?: boolean
+}
 
-    const handleChange = (e) => {
-        setCurrentMessage(e.target.value)
+const InputBar = ({
+  currentMessage,
+  setCurrentMessage,
+  onSubmit,
+  onFileSelect,
+  uploading = false,
+  disabled = false,
+}: InputBarProps) => {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [focused, setFocused] = useState(false)
+  const [attachHover, setAttachHover] = useState(false)
+  const [sendHover, setSendHover] = useState(false)
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      onSubmit(e as any)
     }
+  }
 
-    return (
-        <form onSubmit={onSubmit} className="p-4 bg-white">
-            <div className="flex items-center bg-[#F9F9F5] rounded-full p-3 shadow-md border border-gray-200">
-                <button
-                    type="button"
-                    className="p-2 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-all duration-200"
-                >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                </button>
-                <input
-                    type="text"
-                    placeholder="Type a message"
-                    value={currentMessage}
-                    onChange={handleChange}
-                    className="flex-grow px-4 py-2 bg-transparent focus:outline-none text-gray-700"
-                />
-                <button
-                    type="button"
-                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all duration-200"
-                >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
-                    </svg>
-                </button>
-                <button
-                    type="submit"
-                    className="bg-gradient-to-r from-teal-500 to-teal-400 hover:from-teal-600 hover:to-teal-500 rounded-full p-3 ml-2 shadow-md transition-all duration-200 group"
-                >
-                    <svg className="w-6 h-6 text-white transform rotate-45 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                    </svg>
-                </button>
-            </div>
-        </form>
-    )
+  const canSend = currentMessage.trim() && !disabled
+
+  return (
+    <div style={{
+      padding: '12px 16px 16px',
+      background: 'var(--bg-surface)',
+      borderTop: '1px solid var(--border-subtle)',
+      flexShrink: 0,
+    }}>
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.docx,.txt"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file && onFileSelect) onFileSelect(file)
+          e.target.value = ''
+        }}
+      />
+
+      {/* Input pill */}
+      <div
+        className="input-glow"
+        style={{
+          display: 'flex', alignItems: 'center',
+          background: 'var(--bg-input)',
+          borderRadius: 'var(--radius-full)',
+          border: `1.5px solid ${focused ? 'var(--accent-blue)' : 'var(--border-medium)'}`,
+          padding: '6px 6px 6px 8px',
+          transition: 'border-color var(--transition-fast), box-shadow var(--transition-fast)',
+          boxShadow: focused ? '0 0 0 3px rgba(26,115,232,0.12)' : 'var(--shadow-sm)',
+        }}
+      >
+        {/* Attach button — Fitts's Law: 44px target */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading || disabled}
+          title="Upload PDF, DOCX, or TXT"
+          aria-label="Attach a document"
+          onMouseEnter={() => setAttachHover(true)}
+          onMouseLeave={() => setAttachHover(false)}
+          style={{
+            width: 44, height: 44,
+            borderRadius: 'var(--radius-full)',
+            border: 'none',
+            background: attachHover && !uploading && !disabled ? 'var(--bg-surface-3)' : 'transparent',
+            color: uploading ? 'var(--accent-blue)' : 'var(--text-secondary)',
+            cursor: (uploading || disabled) ? 'not-allowed' : 'pointer',
+            opacity: disabled ? 0.4 : 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+            transition: 'background var(--transition-fast), color var(--transition-fast)',
+          }}
+        >
+          {uploading ? (
+            /* Spinning loader */
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+              style={{ animation: 'spin 0.8s linear infinite' }}>
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+              <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+            </svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+          )}
+        </button>
+
+        {/* Text input */}
+        <input
+          type="text"
+          placeholder={disabled ? 'Loading conversation…' : uploading ? 'Uploading document…' : 'Ask your Gyaankosh assistant anything…'}
+          value={currentMessage}
+          onChange={(e) => setCurrentMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          disabled={disabled}
+          aria-label="Message input"
+          style={{
+            flex: 1,
+            padding: '8px 12px',
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            fontSize: 15,
+            color: 'var(--text-primary)',
+            fontFamily: 'inherit',
+            opacity: disabled ? 0.5 : 1,
+            cursor: disabled ? 'not-allowed' : 'text',
+          }}
+        />
+
+        {/* Send button — Fitts's Law: 44px target, always visible */}
+        <button
+          type="button"
+          onClick={() => canSend && onSubmit({} as React.FormEvent)}
+          disabled={!canSend}
+          title="Send message (Enter)"
+          aria-label="Send message"
+          onMouseEnter={() => setSendHover(true)}
+          onMouseLeave={() => setSendHover(false)}
+          style={{
+            width: 44, height: 44,
+            borderRadius: 'var(--radius-full)',
+            border: 'none',
+            background: canSend
+              ? (sendHover ? '#1557b0' : 'var(--accent-blue)')
+              : 'var(--bg-surface-3)',
+            color: canSend ? '#fff' : 'var(--text-tertiary)',
+            cursor: canSend ? 'pointer' : 'not-allowed',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+            transition: 'background var(--transition-fast), transform var(--transition-fast)',
+            transform: canSend && sendHover ? 'scale(1.05)' : 'scale(1)',
+            boxShadow: canSend ? '0 2px 8px rgba(26,115,232,0.35)' : 'none',
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* Helper hint */}
+      <p style={{
+        fontSize: 11, color: 'var(--text-tertiary)',
+        textAlign: 'center', marginTop: 8, marginBottom: 0,
+        letterSpacing: '0.01em',
+      }}>
+        Press <kbd style={{
+          fontSize: 10, padding: '1px 5px',
+          borderRadius: 4, border: '1px solid var(--border-medium)',
+          background: 'var(--bg-surface-3)',
+          color: 'var(--text-secondary)',
+          fontFamily: 'monospace',
+        }}>Enter</kbd> to send · <kbd style={{
+          fontSize: 10, padding: '1px 5px',
+          borderRadius: 4, border: '1px solid var(--border-medium)',
+          background: 'var(--bg-surface-3)',
+          color: 'var(--text-secondary)',
+          fontFamily: 'monospace',
+        }}>Shift+Enter</kbd> for newline · Attach PDF, DOCX, or TXT
+      </p>
+    </div>
+  )
 }
 
 export default InputBar
